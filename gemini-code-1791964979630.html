@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartExam - MCQ Examination Portal</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS CDN for Excel parsing & export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Firebase Configuration & SDK Initialization -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, getDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCC-jC8Qv3VAw-Lf_IhtxFRWZTg-gLsAOM",
+            authDomain: "mcq-exam-portal-f63ae.firebaseapp.com",
+            projectId: "mcq-exam-portal-f63ae",
+            storageBucket: "mcq-exam-portal-f63ae.appspot.com",
+            messagingSenderId: "357044492700",
+            appId: "1:357044492700:web:5d1b5f9ac203297e2e5059",
+            measurementId: "G-106FMV06WN"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.fs_collection = collection;
+        window.fs_doc = doc;
+        window.fs_setDoc = setDoc;
+        window.fs_getDocs = getDocs;
+        window.fs_getDoc = getDoc;
+        window.fs_deleteDoc = deleteDoc;
+        window.fs_onSnapshot = onSnapshot;
+    </script>
+
+    <style>
+        :root {
+            --bs-primary-rgb: 79, 70, 229;
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --secondary-bg: #f8fafc;
+            --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: #f1f5f9;
+            color: #334155;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .card-custom {
+            border: none;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            background: #ffffff;
+        }
+        .btn-primary-custom {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        .btn-primary-custom:hover {
+            background-color: var(--primary-hover);
+            border-color: var(--primary-hover);
+            color: white;
+        }
+        .q-badge {
+            width: 38px;
+            height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 3px;
+            font-size: 0.9rem;
+        }
+        .q-badge.not-visited { background-color: #e2e8f0; color: #475569; }
+        .q-badge.answered { background-color: #10b981; color: white; }
+        .q-badge.flagged { background-color: #f59e0b; color: white; }
+        .q-badge.active { border: 2px solid #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4); }
+
+        .option-card {
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            background-color: #fff;
+        }
+        .option-card:hover { border-color: #a5b4fc; background-color: #f5f3ff; }
+        .option-card.selected { border-color: var(--primary-color); background-color: #eef2ff; }
+        #toastContainer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1080;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#" onclick="switchRole('welcome')">
+                <i class="fa-solid me-1 fa-graduation-cap text-warning fs-4"></i>
+                <span class="fw-bold">SmartExam Portal (Cloud Sync)</span>
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <div id="currentUserBadge" class="text-light fs-7 d-none">
+                    <span class="badge bg-primary rounded-pill p-2" id="userBadgeText">User</span>
+                </div>
+                <button id="btnLogout" class="btn btn-danger btn-sm rounded-pill px-3 d-none" onclick="logout()">
+                    <i class="fa-solid fa-right-from-bracket me-1"></i> Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="container-fluid flex-grow-1 p-3 p-md-4">
+
+        <!-- VIEW: Welcome / Role Selection -->
+        <div id="view-welcome" class="row justify-content-center align-items-center min-vh-75 py-5">
+            <div class="col-md-10 col-lg-8">
+                <div class="text-center mb-5">
+                    <h1 class="fw-bold text-dark mb-2">Welcome to SmartExam Portal</h1>
+                    <p class="text-muted fs-5">Secure MCQ examination platform with real-time cloud synchronization</p>
+                </div>
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="card card-custom h-100 text-center p-4">
+                            <div class="card-body d-flex flex-column align-items-center justify-content-between">
+                                <div>
+                                    <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex p-3 mb-3">
+                                        <i class="fa-solid fa-chalkboard-user fa-3x"></i>
+                                    </div>
+                                    <h3 class="fw-bold text-dark">Teacher Portal</h3>
+                                    <p class="text-muted">Manage classes, configure question banks, schedule exams, and export scores class/test-wise.</p>
+                                </div>
+                                <button class="btn btn-primary-custom btn-lg w-100 rounded-3 mt-3 fw-semibold" onclick="showTeacherLogin()">Teacher Login</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card card-custom h-100 text-center p-4">
+                            <div class="card-body d-flex flex-column align-items-center justify-content-between">
+                                <div>
+                                    <div class="bg-success-subtle text-success rounded-circle d-inline-flex p-3 mb-3">
+                                        <i class="fa-solid fa-user-graduate fa-3x"></i>
+                                    </div>
+                                    <h3 class="fw-bold text-dark">Student Portal</h3>
+                                    <p class="text-muted">Take assigned tests securely with randomized questions and proctoring window protection.</p>
+                                </div>
+                                <button class="btn btn-success btn-lg w-100 rounded-3 mt-3 fw-semibold" onclick="showStudentLogin()">Student Login</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: Teacher Login -->
+        <div id="view-teacher-login" class="row justify-content-center py-5 d-none">
+            <div class="col-md-5 col-lg-4">
+                <div class="card card-custom p-4">
+                    <div class="card-body">
+                        <h3 class="fw-bold text-center mb-4">Teacher Login</h3>
+                        <form onsubmit="handleTeacherLogin(event)">
+                            <div class="mb-3"><label class="form-label">Username</label><input type="text" id="teacherUsernameInput" class="form-control" required value="admin"></div>
+                            <div class="mb-4"><label class="form-label">Password</label><input type="password" id="teacherPasswordInput" class="form-control" required value="admin123"></div>
+                            <button type="submit" class="btn btn-primary-custom btn-lg w-100 mb-2">Login</button>
+                            <button type="button" class="btn btn-light w-100" onclick="switchRole('welcome')">Back</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: Student Login -->
+        <div id="view-student-login" class="row justify-content-center py-5 d-none">
+            <div class="col-md-5 col-lg-4">
+                <div class="card card-custom p-4">
+                    <div class="card-body">
+                        <h3 class="fw-bold text-center mb-4">Student Login</h3>
+                        <form onsubmit="handleStudentLogin(event)">
+                            <div class="mb-3"><label class="form-label">Select Class</label><select id="studentClassSelect" class="form-select" required><option value="">Choose Class...</option></select></div>
+                            <div class="mb-4"><label class="form-label">Roll Number</label><input type="text" id="studentRollInput" class="form-control" placeholder="e.g., 101" required></div>
+                            <button type="submit" class="btn btn-success btn-lg w-100 mb-2">Enter Portal</button>
+                            <button type="button" class="btn btn-light w-100" onclick="switchRole('welcome')">Back</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: Teacher Dashboard -->
+        <div id="view-teacher-dashboard" class="d-none">
+            <div class="row">
+                <div class="col-md-3 col-lg-2 mb-4">
+                    <div class="card card-custom p-2">
+                        <div class="nav flex-column nav-pills me-3" id="v-pills-tab" role="tablist">
+                            <button class="nav-link active text-start mb-1" data-bs-toggle="pill" data-bs-target="#tab-classes" type="button"><i class="fa-solid fa-school me-2"></i> Classes & Students</button>
+                            <button class="nav-link text-start mb-1" data-bs-toggle="pill" data-bs-target="#tab-questions" type="button"><i class="fa-solid fa-file-excel me-2"></i> Question Banks</button>
+                            <button class="nav-link text-start mb-1" data-bs-toggle="pill" data-bs-target="#tab-schedules" type="button"><i class="fa-solid fa-calendar-check me-2"></i> Exam Schedules</button>
+                            <button class="nav-link text-start mb-1" data-bs-toggle="pill" data-bs-target="#tab-results" type="button"><i class="fa-solid fa-chart-column me-2"></i> Results & Export</button>
+                            <button class="nav-link text-start mb-1" data-bs-toggle="pill" data-bs-target="#tab-settings" type="button"><i class="fa-solid fa-key me-2"></i> Teacher Settings</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-9 col-lg-10">
+                    <div class="tab-content">
+                        <!-- TAB 1: Classes & Students -->
+                        <div class="tab-pane fade show active" id="tab-classes">
+                            <div class="card card-custom p-4 mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                    <div>
+                                        <h4 class="fw-bold mb-0">Class Management & Student Rosters</h4>
+                                        <p class="text-muted small mb-0">Create/delete classes, add single students, or upload student rosters via Excel.</p>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-outline-primary rounded-3" onclick="openAddClassModal()"><i class="fa-solid fa-plus me-1"></i> Add Class</button>
+                                        <button class="btn btn-success rounded-3" onclick="openUploadStudentsModal()"><i class="fa-solid fa-file-import me-1"></i> Bulk Upload Students</button>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="alert alert-info small mb-3">
+                                    <i class="fa-solid fa-circle-info me-1"></i> <strong>Excel Sequence Guide for Students:</strong> Your uploaded spreadsheet must feature column headers named <code>RollNo</code> (or Roll No) and <code>Name</code> (or Student Name).
+                                </div>
+                                <div class="row g-3" id="classListContainer"></div>
+                            </div>
+                        </div>
+
+                        <!-- TAB 2: Question Banks -->
+                        <div class="tab-pane fade" id="tab-questions">
+                            <div class="card card-custom p-4 mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                    <div>
+                                        <h4 class="fw-bold mb-0">Subject Question Banks & Test Pools</h4>
+                                        <p class="text-muted small mb-0">Upload question pools, set duration, and randomize subset sizes per student.</p>
+                                    </div>
+                                    <button class="btn btn-primary-custom rounded-3" onclick="openUploadQuestionsModal()"><i class="fa-solid fa-cloud-arrow-up me-1"></i> Upload Question Bank</button>
+                                </div>
+                                <hr>
+                                <div class="alert alert-info small mb-3">
+                                    <i class="fa-solid fa-circle-info me-1"></i> <strong>Excel Sequence Guide for Questions:</strong> Your uploaded spreadsheet must feature exact column headers: <code>Question</code>, <code>OptionA</code>, <code>OptionB</code>, <code>OptionC</code>, <code>OptionD</code>, and <code>CorrectAnswer</code> (with value as <code>A</code>, <code>B</code>, <code>C</code>, or <code>D</code>).
+                                </div>
+                                <div class="row g-3" id="questionBanksContainer"></div>
+                            </div>
+                        </div>
+
+                        <!-- TAB 3: Exam Schedules -->
+                        <div class="tab-pane fade" id="tab-schedules">
+                            <div class="card card-custom p-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div>
+                                        <h4 class="fw-bold mb-0">Active Exam Schedules & Rules</h4>
+                                        <p class="text-muted small mb-0">Review active test windows, configure subset sizes, and modify exam settings.</p>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead class="table-light"><tr><th>Subject / Test</th><th>Class</th><th>Subset Size</th><th>Duration</th><th>Window</th><th>Action</th></tr></thead>
+                                        <tbody id="examScheduleTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB 4: Results & Export -->
+                        <div class="tab-pane fade" id="tab-results">
+                            <div class="card card-custom p-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                    <div>
+                                        <h4 class="fw-bold mb-0">Student Submissions & Analytics</h4>
+                                        <p class="text-muted small mb-0">Marks are hidden from students. Download structured Excel sheets separated class-wise and test-wise.</p>
+                                    </div>
+                                    <button class="btn btn-success rounded-3" onclick="exportResultsClassAndTestWise()"><i class="fa-solid fa-file-excel me-1"></i> Download Class & Test-wise Excel</button>
+                                </div>
+                                <hr>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead class="table-light"><tr><th>Roll No</th><th>Name</th><th>Class</th><th>Subject</th><th>Score</th><th>Login Time</th><th>Logout Time</th><th>Malpractice Terminated</th><th>Action</th></tr></thead>
+                                        <tbody id="resultsTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB 5: Teacher Settings -->
+                        <div class="tab-pane fade" id="tab-settings">
+                            <div class="card card-custom p-4 col-md-6">
+                                <h4 class="fw-bold mb-3">Teacher Account Settings</h4>
+                                <p class="text-muted small mb-3">Update your login username and password credentials for the teacher portal.</p>
+                                <form onsubmit="handleUpdateTeacherCreds(event)">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">New Username</label>
+                                        <input type="text" id="settingsNewUsername" class="form-control" required value="admin">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">New Password</label>
+                                        <input type="password" id="settingsNewPassword" class="form-control" required value="admin123">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary-custom rounded-3"><i class="fa-solid fa-floppy-disk me-1"></i> Save Credentials</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: Student Dashboard -->
+        <div id="view-student-dashboard" class="d-none">
+            <div class="container py-3">
+                <div class="card card-custom p-4 mb-4 bg-primary text-white">
+                    <h2 class="fw-bold mb-1" id="studentWelcomeTitle">Welcome, Student!</h2>
+                    <p class="mb-0 fs-6" id="studentDetailSub">Class: -- | Roll No: --</p>
+                </div>
+                <h4 class="fw-bold mb-3">Available Examinations</h4>
+                <div class="row g-4" id="availableExamsContainer"></div>
+            </div>
+        </div>
+
+        <!-- VIEW: Active Exam View -->
+        <div id="view-active-exam" class="d-none">
+            <div class="alert alert-warning d-flex justify-content-between align-items-center mb-3">
+                <span><i class="fa-solid fa-shield-halved me-2"></i><strong>Anti-Cheating Active:</strong> Tab switches monitored (Terminates on 4th trial).</span>
+                <span class="badge bg-danger fs-6">Tab Switches: <span id="windowSwitchCounter">0</span> / 3</span>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4 col-lg-3">
+                    <div class="card card-custom p-3 text-center mb-3">
+                        <small class="text-muted fw-bold">TIME REMAINING</small>
+                        <h2 class="fw-bold text-danger my-1" id="examTimer">15:00</h2>
+                        <small class="text-muted" id="examSubjectTitle">Subject</small>
+                    </div>
+                    <div class="card card-custom p-3">
+                        <h6 class="fw-bold mb-3">Question Palette</h6>
+                        <div class="d-flex flex-wrap gap-1 mb-3" id="questionGridBadges"></div>
+                        <button class="btn btn-success w-100 fw-bold py-2" onclick="confirmSubmitExamModal()">Submit Final Test</button>
+                    </div>
+                </div>
+                <div class="col-md-8 col-lg-9">
+                    <div class="card card-custom p-4 min-vh-50 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="badge bg-primary fs-6" id="questionNumberIndicator">Question 1 of 10</span>
+                                <button class="btn btn-outline-warning btn-sm rounded-pill" onclick="toggleFlagCurrentQuestion()"><i class="fa-solid fa-flag me-1"></i> Flag</button>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-4" id="questionText">Loading question...</h5>
+                            <div id="optionsContainer"></div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center border-top pt-3 mt-4">
+                            <button class="btn btn-outline-secondary px-4" onclick="navigateQuestion(-1)"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                            <button class="btn btn-outline-danger" onclick="clearCurrentAnswer()">Clear</button>
+                            <button class="btn btn-primary-custom px-4" onclick="navigateQuestion(1)">Next <i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: Exam Result View (MARKS HIDDEN FOR STUDENTS) -->
+        <div id="view-exam-result" class="row justify-content-center py-5 d-none">
+            <div class="col-md-6">
+                <div class="card card-custom text-center p-5">
+                    <i class="fa-solid fa-circle-check fa-4x text-success mb-3"></i>
+                    <h2 class="fw-bold mb-2">Exam Successfully Submitted!</h2>
+                    <p class="text-muted mb-4">Your responses have been securely recorded. Final marks are withheld and will be published by your instructor.</p>
+                    <button class="btn btn-primary-custom px-4 py-2" onclick="switchRole('welcome')">Return to Home</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODALS -->
+    <div class="modal fade" id="addClassModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Add New Class</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="text" id="newClassNameInput" class="form-control" placeholder="e.g. Class 10-A"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" onclick="saveNewClass()">Save Class</button></div></div></div></div>
+    
+    <div class="modal fade" id="addSingleStudentModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Add Student Manually</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form onsubmit="handleSaveSingleStudent(event)"><div class="modal-body"><input type="hidden" id="singleStudentClassId"><div class="mb-3"><label class="form-label">Roll Number</label><input type="text" id="singleStudentRoll" class="form-control" required></div><div class="mb-3"><label class="form-label">Student Name</label><input type="text" id="singleStudentName" class="form-control" required></div></div><div class="modal-footer"><button type="submit" class="btn btn-primary">Add Student</button></div></form></div></div></div>
+
+    <div class="modal fade" id="uploadStudentsModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Bulk Upload Students</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form onsubmit="handleUploadStudentsExcel(event)"><div class="modal-body"><div class="mb-3"><label class="form-label">Target Class</label><select id="uploadStudentTargetClass" class="form-select" required></select></div><div class="mb-3"><label class="form-label">Excel File (.xlsx / .csv)</label><input type="file" id="studentsExcelFileInput" class="form-control" accept=".xlsx, .xls, .csv" required><small class="text-muted">Columns required: <code>RollNo</code>, <code>Name</code></small></div></div><div class="modal-footer"><button type="submit" class="btn btn-success">Import Students</button></div></form></div></div></div>
+
+    <div class="modal fade" id="uploadQuestionsModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Upload Question Bank</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form onsubmit="handleUploadQuestionsExcel(event)"><div class="modal-body">
+        <div class="mb-3"><label class="form-label">Subject / Exam Name</label><input type="text" id="questionBankSubjectInput" class="form-control" placeholder="e.g. Physics Test 1" required></div>
+        <div class="mb-3"><label class="form-label">Assign to Class</label><select id="questionBankClassSelect" class="form-select" required></select></div>
+        <div class="row mb-3">
+            <div class="col-4"><label class="form-label">Qs Per Student Set</label><input type="number" id="questionBankQuestionsPerSet" class="form-control" value="20" required></div>
+            <div class="col-4"><label class="form-label">Duration (Mins)</label><input type="number" id="questionBankDuration" class="form-control" value="20" required></div>
+            <div class="col-4"><label class="form-label">Max Switches</label><input type="number" id="questionBankMaxSwitches" class="form-control" value="3" required></div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-6"><label class="form-label">Start Time</label><input type="datetime-local" id="questionBankStartTime" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">End Time</label><input type="datetime-local" id="questionBankEndTime" class="form-control" required></div>
+        </div>
+        <div class="mb-3"><label class="form-label">Excel Question File (.xlsx / .csv)</label><input type="file" id="questionsExcelFileInput" class="form-control" accept=".xlsx, .xls, .csv" required><small class="text-muted">Columns: <code>Question</code>, <code>OptionA</code>, <code>OptionB</code>, <code>OptionC</code>, <code>OptionD</code>, <code>CorrectAnswer</code></small></div>
+    </div><div class="modal-footer"><button type="submit" class="btn btn-primary">Publish Question Bank</button></div></form></div></div></div>
+
+    <!-- Core App Engine Script with Real-Time Firebase Sync -->
+    <script>
+        let currentUserRole = 'welcome';
+        let currentStudentInfo = null;
+        let activeExamData = null;
+        let currentQuestionIndex = 0;
+        let studentAnswers = {};
+        let flaggedQuestions = {};
+        let tabSwitchCount = 0;
+        let examTimerInterval = null;
+        let examTimeRemaining = 0;
+        let examLoginTimestamp = null;
+        let isTerminatedDueToMalpractice = false;
+
+        window.cachedClasses = [];
+        window.cachedQuestionBanks = [];
+        window.cachedResults = [];
+        window.cachedStudents = [];
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await initializeCloudDataDefaults();
+            setupFirebaseListeners();
+            switchRole('welcome');
+            
+            document.addEventListener("visibilitychange", () => {
+                if (document.hidden && currentUserRole === 'active-exam') {
+                    tabSwitchCount++;
+                    const counterEl = document.getElementById('windowSwitchCounter');
+                    if (counterEl) counterEl.innerText = tabSwitchCount;
+
+                    if (tabSwitchCount >= 4) {
+                        isTerminatedDueToMalpractice = true;
+                        alert("Maximum tab switch limit exceeded (4th trial violation). Your exam is being automatically terminated and submitted.");
+                        submitExamFinal();
+                    }
+                }
+            });
+        });
+
+        async function initializeCloudDataDefaults() {
+            try {
+                const adminRef = window.fs_doc(window.db, "metadata", "credentials");
+                const adminSnap = await window.fs_getDoc(adminRef);
+                if (!adminSnap.exists()) {
+                    await window.fs_setDoc(adminRef, { username: "admin", password: "admin123" });
+                }
+            } catch (e) {
+                console.error("Cloud init error:", e);
+            }
+        }
+
+        function setupFirebaseListeners() {
+            window.fs_onSnapshot(window.fs_collection(window.db, "classes"), (snapshot) => {
+                window.cachedClasses = [];
+                snapshot.forEach(doc => window.cachedClasses.push({ id: doc.id, ...doc.data() }));
+                renderClassesList();
+                populateStudentClassDropdown();
+            });
+
+            window.fs_onSnapshot(window.fs_collection(window.db, "students"), (snapshot) => {
+                window.cachedStudents = [];
+                snapshot.forEach(doc => window.cachedStudents.push({ id: doc.id, ...doc.data() }));
+                renderClassesList();
+            });
+
+            window.fs_onSnapshot(window.fs_collection(window.db, "questionBanks"), (snapshot) => {
+                window.cachedQuestionBanks = [];
+                snapshot.forEach(doc => window.cachedQuestionBanks.push({ id: doc.id, ...doc.data() }));
+                renderQuestionBanksList();
+                renderExamSchedulesTable();
+                if (currentUserRole === 'student-dashboard') renderStudentExams();
+            });
+
+            window.fs_onSnapshot(window.fs_collection(window.db, "results"), (snapshot) => {
+                window.cachedResults = [];
+                snapshot.forEach(doc => window.cachedResults.push({ id: doc.id, ...doc.data() }));
+                renderResultsTable();
+                if (currentUserRole === 'student-dashboard') renderStudentExams();
+            });
+        }
+
+        function switchRole(role) {
+            currentUserRole = role;
+            ['view-welcome', 'view-teacher-login', 'view-student-login', 'view-teacher-dashboard', 'view-student-dashboard', 'view-active-exam', 'view-exam-result'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('d-none');
+            });
+            const badge = document.getElementById('currentUserBadge');
+            const logoutBtn = document.getElementById('btnLogout');
+            if (badge) badge.classList.add('d-none');
+            if (logoutBtn) logoutBtn.classList.add('d-none');
+
+            if (role === 'welcome') document.getElementById('view-welcome').classList.remove('d-none');
+            else if (role === 'teacher-login') document.getElementById('view-teacher-login').classList.remove('d-none');
+            else if (role === 'student-login') {
+                document.getElementById('view-student-login').classList.remove('d-none');
+                populateStudentClassDropdown();
+            } else if (role === 'teacher-dashboard') {
+                document.getElementById('view-teacher-dashboard').classList.remove('d-none');
+                if (badge) badge.classList.remove('d-none');
+                document.getElementById('userBadgeText').innerText = "Teacher: Admin";
+                if (logoutBtn) logoutBtn.classList.remove('d-none');
+            } else if (role === 'student-dashboard') {
+                document.getElementById('view-student-dashboard').classList.remove('d-none');
+                if (badge) badge.classList.remove('d-none');
+                document.getElementById('userBadgeText').innerText = `Student: ${currentStudentInfo.name} (${currentStudentInfo.rollNo})`;
+                if (logoutBtn) logoutBtn.classList.remove('d-none');
+                renderStudentExams();
+            } else if (role === 'active-exam') document.getElementById('view-active-exam').classList.remove('d-none');
+            else if (role === 'exam-result') document.getElementById('view-exam-result').classList.remove('d-none');
+        }
+
+        function showTeacherLogin() { switchRole('teacher-login'); }
+        function showStudentLogin() { switchRole('student-login'); }
+        function logout() { switchRole('welcome'); }
+
+        async function handleTeacherLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('teacherUsernameInput').value;
+            const p = document.getElementById('teacherPasswordInput').value;
+            try {
+                const docSnap = await window.fs_getDoc(window.fs_doc(window.db, "metadata", "credentials"));
+                const creds = docSnap.exists() ? docSnap.data() : { username: "admin", password: "admin123" };
+                if (u === creds.username && p === creds.password) switchRole('teacher-dashboard');
+                else alert("Invalid credentials.");
+            } catch (err) { alert("Login connection error."); }
+        }
+
+        async function handleUpdateTeacherCreds(e) {
+            e.preventDefault();
+            const newU = document.getElementById('settingsNewUsername').value.trim();
+            const newP = document.getElementById('settingsNewPassword').value.trim();
+            await window.fs_setDoc(window.fs_doc(window.db, "metadata", "credentials"), { username: newU, password: newP });
+            alert("Teacher login credentials updated successfully!");
+        }
+
+        async function saveNewClass() {
+            const className = document.getElementById('newClassNameInput').value.trim();
+            if (!className) return;
+            await window.fs_setDoc(window.fs_doc(window.db, "classes", className), { name: className });
+            bootstrap.Modal.getInstance(document.getElementById('addClassModal')).hide();
+            document.getElementById('newClassNameInput').value = "";
+        }
+
+        async function deleteClass(className) {
+            if (confirm(`Are you sure you want to delete class "${className}"? All associated students will be removed.`)) {
+                await window.fs_deleteDoc(window.fs_doc(window.db, "classes", className));
+                for (const s of (window.cachedStudents || []).filter(st => st.className === className)) {
+                    await window.fs_deleteDoc(window.fs_doc(window.db, "students", s.id));
+                }
+            }
+        }
+
+        function openAddClassModal() { new bootstrap.Modal(document.getElementById('addClassModal')).show(); }
+
+        function openAddSingleStudentModal(className) {
+            document.getElementById('singleStudentClassId').value = className;
+            document.getElementById('singleStudentRoll').value = "";
+            document.getElementById('singleStudentName').value = "";
+            new bootstrap.Modal(document.getElementById('addSingleStudentModal')).show();
+        }
+
+        async function handleSaveSingleStudent(e) {
+            e.preventDefault();
+            const className = document.getElementById('singleStudentClassId').value;
+            const rollNo = document.getElementById('singleStudentRoll').value.trim();
+            const name = document.getElementById('singleStudentName').value.trim();
+            if (!rollNo || !name) return;
+
+            const studentId = `${className}_${rollNo}`.replace(/\s+/g, '_');
+            await window.fs_setDoc(window.fs_doc(window.db, "students", studentId), { className, rollNo: String(rollNo), name: String(name) });
+            bootstrap.Modal.getInstance(document.getElementById('addSingleStudentModal')).hide();
+            alert("Student added successfully!");
+        }
+
+        async function deleteStudent(studentId) {
+            if (confirm("Remove this student from the class?")) {
+                await window.fs_deleteDoc(window.fs_doc(window.db, "students", studentId));
+            }
+        }
+
+        async function deleteQuestionBank(qbId) {
+            if (confirm("Are you sure you want to delete this question bank?")) {
+                await window.fs_deleteDoc(window.fs_doc(window.db, "questionBanks", qbId));
+            }
+        }
+
+        async function deleteResult(resultId, studentName, subject) {
+            if (confirm(`Are you sure you want to delete the result for ${studentName} (${subject})? This will allow the student to retake the exam.`)) {
+                await window.fs_deleteDoc(window.fs_doc(window.db, "results", resultId));
+                alert("Result deleted successfully.");
+            }
+        }
+
+        function renderClassesList() {
+            const container = document.getElementById('classListContainer');
+            if (!container) return;
+            container.innerHTML = "";
+            if (!window.cachedClasses || window.cachedClasses.length === 0) {
+                container.innerHTML = '<p class="text-muted">No classes created yet.</p>';
+                return;
+            }
+            window.cachedClasses.forEach(cls => {
+                const students = (window.cachedStudents || []).filter(s => s.className === cls.name);
+                let studentRows = students.map(s => `
+                    <div class="d-flex justify-content-between align-items-center border-bottom py-1 small">
+                        <span><strong>Roll: ${s.rollNo}</strong> - ${s.name}</span>
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="deleteStudent('${s.id}')"><i class="fa-solid fa-trash"></i></button>
+                    </div>`).join('');
+                if (!studentRows) studentRows = '<p class="text-muted small mb-0">No students enrolled.</p>';
+
+                container.innerHTML += `
+                    <div class="col-md-4">
+                        <div class="card p-3 border shadow-sm h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0 fw-bold">${cls.name}</h5>
+                                <button class="btn btn-sm btn-danger" onclick="deleteClass('${cls.name}')"><i class="fa-solid fa-trash me-1"></i> Delete</button>
+                            </div>
+                            <p class="small text-muted mb-2">Students: ${students.length}</p>
+                            <div class="border rounded p-2 bg-light mb-2" style="max-height: 150px; overflow-y: auto;">
+                                ${studentRows}
+                            </div>
+                            <button class="btn btn-outline-primary btn-sm w-100 mt-auto" onclick="openAddSingleStudentModal('${cls.name}')">+ Add Student Manually</button>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function populateStudentClassDropdown() {
+            const select = document.getElementById('studentClassSelect');
+            const uploadSelect = document.getElementById('uploadStudentTargetClass');
+            const qClassSelect = document.getElementById('questionBankClassSelect');
+
+            const options = (window.cachedClasses || []).map(cls => `<option value="${cls.name}">${cls.name}</option>`).join('');
+            if (select) select.innerHTML = '<option value="">Choose Class...</option>' + options;
+            if (uploadSelect) uploadSelect.innerHTML = '<option value="">Choose Class...</option>' + options;
+            if (qClassSelect) qClassSelect.innerHTML = '<option value="">Choose Class...</option>' + options;
+        }
+
+        function handleStudentLogin(e) {
+            e.preventDefault();
+            const className = document.getElementById('studentClassSelect').value;
+            const rollNo = document.getElementById('studentRollInput').value.trim();
+            
+            const studentExists = (window.cachedStudents || []).find(s => s.className === className && s.rollNo === rollNo);
+            if (!studentExists) {
+                alert("Roll number not found in this class roster. Please check with your teacher.");
+                return;
+            }
+
+            currentStudentInfo = { class: className, rollNo: rollNo, name: studentExists.name };
+            switchRole('student-dashboard');
+        }
+
+        function openUploadStudentsModal() {
+            populateStudentClassDropdown();
+            new bootstrap.Modal(document.getElementById('uploadStudentsModal')).show();
+        }
+
+        function handleUploadStudentsExcel(e) {
+            e.preventDefault();
+            const className = document.getElementById('uploadStudentTargetClass').value;
+            const file = document.getElementById('studentsExcelFileInput').files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(evt) {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                
+                for (const row of rows) {
+                    const rollNo = row.RollNo || row['Roll No'] || row.rollno;
+                    const name = row.Name || row['Student Name'] || row.name;
+                    if (rollNo && name) {
+                        const studentId = `${className}_${rollNo}`.replace(/\s+/g, '_');
+                        await window.fs_setDoc(window.fs_doc(window.db, "students", studentId), { className, rollNo: String(rollNo), name: String(name) });
+                    }
+                }
+                bootstrap.Modal.getInstance(document.getElementById('uploadStudentsModal')).hide();
+                alert("Students imported successfully!");
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function openUploadQuestionsModal() {
+            populateStudentClassDropdown();
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const localIso = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            document.getElementById('questionBankStartTime').value = localIso;
+            document.getElementById('questionBankEndTime').value = localIso;
+            new bootstrap.Modal(document.getElementById('uploadQuestionsModal')).show();
+        }
+
+        function handleUploadQuestionsExcel(e) {
+            e.preventDefault();
+            const subject = document.getElementById('questionBankSubjectInput').value.trim();
+            const className = document.getElementById('questionBankClassSelect').value;
+            const questionsPerSet = parseInt(document.getElementById('questionBankQuestionsPerSet').value) || 10;
+            const durationMins = parseInt(document.getElementById('questionBankDuration').value) || 15;
+            const maxSwitches = parseInt(document.getElementById('questionBankMaxSwitches').value) || 3;
+            const startTime = document.getElementById('questionBankStartTime').value;
+            const endTime = document.getElementById('questionBankEndTime').value;
+            const file = document.getElementById('questionsExcelFileInput').files[0];
+
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(evt) {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                
+                const questions = [];
+                rows.forEach(r => {
+                    const question = r.Question || r.question;
+                    const optionA = r.OptionA || r.optionA;
+                    const optionB = r.OptionB || r.optionB;
+                    const optionC = r.OptionC || r.optionC;
+                    const optionD = r.OptionD || r.optionD;
+                    const correctOption = (r.CorrectAnswer || r.correctAnswer || '').toString().trim().toUpperCase();
+                    if (question && optionA && optionB && correctOption) {
+                        questions.push({ question, optionA, optionB, optionC, optionD, correctOption });
+                    }
+                });
+
+                const qbId = `${className}_${subject}`.replace(/\s+/g, '_');
+                await window.fs_setDoc(window.fs_doc(window.db, "questionBanks", qbId), {
+                    id: qbId, subject, className, questionsPerSet, durationMins, maxSwitches, startTime, endTime, questions
+                });
+                bootstrap.Modal.getInstance(document.getElementById('uploadQuestionsModal')).hide();
+                alert("Question bank published successfully!");
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function renderQuestionBanksList() {
+            const container = document.getElementById('questionBanksContainer');
+            if (!container) return;
+            container.innerHTML = "";
+            if (!window.cachedQuestionBanks || window.cachedQuestionBanks.length === 0) {
+                container.innerHTML = '<p class="text-muted">No question banks uploaded yet.</p>';
+                return;
+            }
+            window.cachedQuestionBanks.forEach(b => {
+                container.innerHTML += `
+                    <div class="col-md-4">
+                        <div class="card p-3 border shadow-sm h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5>${b.subject}</h5>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteQuestionBank('${b.id}')"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                            <p class="small text-muted mb-1">Class: ${b.className}</p>
+                            <p class="small text-muted mb-0">Total Pool: ${b.questions.length} | Subset: ${b.questionsPerSet}</p>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function renderExamSchedulesTable() {
+            const tbody = document.getElementById('examScheduleTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = "";
+            if (!window.cachedQuestionBanks || window.cachedQuestionBanks.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center">No exams scheduled yet.</td></tr>';
+                return;
+            }
+            window.cachedQuestionBanks.forEach(qb => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold">${qb.subject}</td>
+                        <td>${qb.className}</td>
+                        <td>${qb.questionsPerSet} Qs</td>
+                        <td>${qb.durationMins} mins</td>
+                        <td class="small">${new Date(qb.startTime).toLocaleString()} <br>to ${new Date(qb.endTime).toLocaleString()}</td>
+                        <td><button class="btn btn-sm btn-outline-danger" onclick="deleteQuestionBank('${qb.id}')">Delete</button></td>
+                    </tr>`;
+            });
+        }
+
+        function renderStudentExams() {
+            const container = document.getElementById('availableExamsContainer');
+            if (!container) return;
+            container.innerHTML = "";
+            const assigned = (window.cachedQuestionBanks || []).filter(qb => qb.className === currentStudentInfo.class);
+            if (assigned.length === 0) {
+                container.innerHTML = '<p class="text-muted">No examinations assigned for your class.</p>';
+                return;
+            }
+
+            const now = new Date();
+
+            assigned.forEach(qb => {
+                const startTime = new Date(qb.startTime);
+                const endTime = new Date(qb.endTime);
+
+                const alreadyAttempted = (window.cachedResults || []).some(
+                    r => r.rollNo === currentStudentInfo.rollNo && r.className === currentStudentInfo.class && r.subject === qb.subject
+                );
+
+                let actionBtn = "";
+                let statusBadge = "";
+
+                if (alreadyAttempted) {
+                    statusBadge = `<span class="badge bg-secondary mb-2">Completed</span>`;
+                    actionBtn = `<button class="btn btn-secondary btn-sm" disabled><i class="fa-solid fa-check me-1"></i> Already Attempted</button>`;
+                } else if (now < startTime) {
+                    statusBadge = `<span class="badge bg-warning text-dark mb-2">Upcoming</span>`;
+                    actionBtn = `<button class="btn btn-outline-secondary btn-sm" disabled>Opens at ${startTime.toLocaleTimeString()}</button>`;
+                } else if (now > endTime) {
+                    statusBadge = `<span class="badge bg-danger mb-2">Closed</span>`;
+                    actionBtn = `<button class="btn btn-outline-danger btn-sm" disabled>Exam Expired</button>`;
+                } else {
+                    statusBadge = `<span class="badge bg-success mb-2">Active Now</span>`;
+                    actionBtn = `<button class="btn btn-primary btn-sm" onclick="startExam('${qb.id}')">Start Exam</button>`;
+                }
+
+                container.innerHTML += `
+                    <div class="col-md-4">
+                        <div class="card card-custom p-3">
+                            <div>${statusBadge}</div>
+                            <h5>${qb.subject}</h5>
+                            <p class="small text-muted mb-2">Questions: ${qb.questionsPerSet} | Duration: ${qb.durationMins}m</p>
+                            ${actionBtn}
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function startExam(qbId) {
+            const qb = window.cachedQuestionBanks.find(b => b.id === qbId);
+            const now = new Date();
+            
+            if (now < new Date(qb.startTime) || now > new Date(qb.endTime)) {
+                alert("This examination is outside its scheduled active window.");
+                renderStudentExams();
+                return;
+            }
+
+            const alreadyAttempted = (window.cachedResults || []).some(
+                r => r.rollNo === currentStudentInfo.rollNo && r.className === currentStudentInfo.class && r.subject === qb.subject
+            );
+            if (alreadyAttempted) {
+                alert("You have already submitted an attempt for this examination and cannot retake it.");
+                renderStudentExams();
+                return;
+            }
+
+            const shuffled = [...qb.questions].sort(() => 0.5 - Math.random());
+            const subset = shuffled.slice(0, qb.questionsPerSet || shuffled.length);
+
+            activeExamData = { qb, questions: subset };
+            currentQuestionIndex = 0;
+            studentAnswers = {};
+            flaggedQuestions = {};
+            tabSwitchCount = 0;
+            examTimeRemaining = (qb.durationMins || 15) * 60;
+            examLoginTimestamp = new Date().toLocaleString();
+            isTerminatedDueToMalpractice = false;
+
+            switchRole('active-exam');
+            renderActiveQuestion();
+            startExamTimer();
+        }
+
+        function startExamTimer() {
+            clearInterval(examTimerInterval);
+            examTimerInterval = setInterval(() => {
+                examTimeRemaining--;
+                const m = Math.floor(examTimeRemaining / 60);
+                const s = examTimeRemaining % 60;
+                const timerEl = document.getElementById('examTimer');
+                if (timerEl) timerEl.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+                if (examTimeRemaining <= 0) {
+                    clearInterval(examTimerInterval);
+                    isTerminatedDueToMalpractice = true;
+                    alert("Time is up! Submitting exam automatically.");
+                    submitExamFinal();
+                }
+            }, 1000);
+        }
+
+        function renderActiveQuestion() {
+            document.getElementById('questionNumberIndicator').innerText = `Question ${currentQuestionIndex + 1} of ${activeExamData.questions.length}`;
+            const q = activeExamData.questions[currentQuestionIndex];
+            document.getElementById('questionText').innerText = q.question;
+            
+            const optsContainer = document.getElementById('optionsContainer');
+            optsContainer.innerHTML = "";
+            ['A', 'B', 'C', 'D'].forEach(optKey => {
+                if (q['option' + optKey]) {
+                    const isSelected = studentAnswers[currentQuestionIndex] === optKey;
+                    optsContainer.innerHTML += `
+                        <div class="option-card ${isSelected ? 'selected' : ''}" onclick="selectOption('${optKey}')">
+                            <strong>${optKey}.</strong> ${q['option' + optKey]}
+                        </div>`;
+                }
+            });
+            renderQuestionPaletteBadges();
+        }
+
+        function selectOption(optKey) {
+            studentAnswers[currentQuestionIndex] = optKey;
+            renderActiveQuestion();
+        }
+
+        function navigateQuestion(direction) {
+            if (currentQuestionIndex + direction >= 0 && currentQuestionIndex + direction < activeExamData.questions.length) {
+                currentQuestionIndex += direction;
+                renderActiveQuestion();
+            }
+        }
+
+        function toggleFlagCurrentQuestion() {
+            flaggedQuestions[currentQuestionIndex] = !flaggedQuestions[currentQuestionIndex];
+            renderQuestionPaletteBadges();
+        }
+
+        function clearCurrentAnswer() {
+            delete studentAnswers[currentQuestionIndex];
+            renderActiveQuestion();
+        }
+
+        function renderQuestionPaletteBadges() {
+            const grid = document.getElementById('questionGridBadges');
+            if (!grid) return;
+            grid.innerHTML = "";
+            activeExamData.questions.forEach((_, idx) => {
+                let cls = "not-visited";
+                if (studentAnswers[idx]) cls = "answered";
+                if (flaggedQuestions[idx]) cls = "flagged";
+                if (idx === currentQuestionIndex) cls += " active";
+                grid.innerHTML += `<span class="q-badge ${cls}" onclick="jumpToQuestion(${idx})">${idx + 1}</span>`;
+            });
+        }
+
+        function jumpToQuestion(idx) {
+            currentQuestionIndex = idx;
+            renderActiveQuestion();
+        }
+
+        function confirmSubmitExamModal() {
+            if (confirm("Are you sure you want to submit your test?")) submitExamFinal();
+        }
+
+        async function submitExamFinal() {
+            clearInterval(examTimerInterval);
+            let score = 0;
+            activeExamData.questions.forEach((q, idx) => {
+                if (studentAnswers[idx] === q.correctOption) score++;
+            });
+            const pct = Math.round((score / activeExamData.questions.length) * 100);
+
+            const logoutTimestamp = new Date().toLocaleString();
+            const resultId = `${currentStudentInfo.class}_${currentStudentInfo.rollNo}_${activeExamData.qb.subject}`.replace(/\s+/g, '_');
+
+            await window.fs_setDoc(window.fs_doc(window.db, "results", resultId), {
+                id: resultId,
+                rollNo: currentStudentInfo.rollNo,
+                name: currentStudentInfo.name,
+                className: currentStudentInfo.class,
+                subject: activeExamData.qb.subject,
+                score: `${score} / ${activeExamData.questions.length}`,
+                percentage: `${pct}%`,
+                loginTime: examLoginTimestamp || "N/A",
+                logoutTime: logoutTimestamp,
+                malpracticeTerminated: isTerminatedDueToMalpractice ? "Yes" : "No",
+                status: "Submitted"
+            });
+
+            switchRole('exam-result');
+        }
+
+        function renderResultsTable() {
+            const tbody = document.getElementById('resultsTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = "";
+            if (!window.cachedResults || window.cachedResults.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-muted text-center">No results submitted yet.</td></tr>';
+                return;
+            }
+            window.cachedResults.forEach(r => {
+                const malpracticeBadge = r.malpracticeTerminated === "Yes" 
+                    ? `<span class="badge bg-danger">Yes</span>` 
+                    : `<span class="badge bg-success">No</span>`;
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${r.rollNo}</td>
+                        <td>${r.name}</td>
+                        <td>${r.className}</td>
+                        <td>${r.subject}</td>
+                        <td>${r.score}</td>
+                        <td class="small">${r.loginTime || 'N/A'}</td>
+                        <td class="small">${r.logoutTime || 'N/A'}</td>
+                        <td>${malpracticeBadge}</td>
+                        <td><button class="btn btn-sm btn-outline-danger" onclick="deleteResult('${r.id}', '${r.name}', '${r.subject}')"><i class="fa-solid fa-trash me-1"></i> Delete</button></td>
+                    </tr>`;
+            });
+        }
+
+        function exportResultsClassAndTestWise() {
+            console.log("Cached Results at export:", window.cachedResults);
+            
+            if (!window.cachedResults || window.cachedResults.length === 0) {
+                alert("No results to export. Make sure students have submitted their tests and data has synced.");
+                return;
+            }
+            
+            try {
+                const workbook = XLSX.utils.book_new();
+                const groups = {};
+                
+                window.cachedResults.forEach(r => {
+                    const className = r.className || "UnassignedClass";
+                    const subject = r.subject || "UnassignedSubject";
+                    if (!groups[className]) groups[className] = {};
+                    if (!groups[className][subject]) groups[className][subject] = [];
+                    
+                    groups[className][subject].push({
+                        "Roll No": r.rollNo || "",
+                        "Student Name": r.name || "",
+                        "Score": r.score || "",
+                        "Percentage": r.percentage || "",
+                        "Login Time": r.loginTime || "N/A",
+                        "Logout Time": r.logoutTime || "N/A",
+                        "Malpractice Terminated": r.malpracticeTerminated || "No",
+                        "Status": r.status || "Submitted"
+                    });
+                });
+
+                for (const [className, subjects] of Object.entries(groups)) {
+                    for (const [subject, rows] of Object.entries(subjects)) {
+                        const worksheet = XLSX.utils.json_to_sheet(rows);
+                        let sheetName = `${className}_${subject}`.replace(/[:\\\/?*\[\]]/g, "_");
+                        if (sheetName.length > 31) sheetName = sheetName.substring(0, 31);
+                        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+                    }
+                }
+
+                XLSX.writeFile(workbook, "Class_and_Test_Wise_Results.xlsx");
+            } catch (err) {
+                console.error("Error generating Excel file:", err);
+                alert("An error occurred while generating the spreadsheet. Check console for details.");
+            }
+        }
+    </script>
+</body>
+</html>
